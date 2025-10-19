@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoints
 app.get("/status", (req, res) =>
   res.json({
     service: "Creator Athena Microservice",
