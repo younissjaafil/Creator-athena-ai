@@ -16,7 +16,6 @@ app.get("/status", (req, res) =>
   })
 );
 
-// Creator service routes
 app.use("/creator", creatorRoutes);
 
 module.exports = app;
