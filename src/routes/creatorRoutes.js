@@ -10,7 +10,7 @@ function validateAgentInput(data, isUpdate = false) {
 
   if (!isUpdate) {
     // Required fields for creation
-    if (!data.creator_id) errors.push("creator_id is required");
+    if (!data.user_id) errors.push("user_id is required");
     if (!data.agent_type) errors.push("agent_type is required");
     if (!data.domain) errors.push("domain is required");
     if (!data.campus) errors.push("campus is required");
@@ -70,21 +70,21 @@ router.post("/agents", async (req, res) => {
 });
 
 /**
- * GET /api/creator/agents?creator_id=xxx
+ * GET /api/creator/agents?user_id=xxx
  * Get all agents for a creator
  */
 router.get("/agents", async (req, res) => {
   try {
-    const { creator_id } = req.query;
+    const { user_id } = req.query;
 
-    if (!creator_id) {
+    if (!user_id) {
       return res.status(400).json({
         success: false,
-        message: "creator_id query parameter is required",
+        message: "user_id query parameter is required",
       });
     }
 
-    const result = await agentService.getAgentsByCreator(creator_id);
+    const result = await agentService.getAgentsByCreator(user_id);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agents:", error);
@@ -102,16 +102,16 @@ router.get("/agents", async (req, res) => {
 router.get("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { creator_id } = req.query;
+    const { user_id } = req.query;
 
-    if (!creator_id) {
+    if (!user_id) {
       return res.status(400).json({
         success: false,
-        message: "creator_id query parameter is required",
+        message: "user_id query parameter is required",
       });
     }
 
-    const result = await agentService.getAgentById(id, creator_id);
+    const result = await agentService.getAgentById(id, user_id);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agent:", error);
@@ -130,12 +130,12 @@ router.get("/agents/:id", async (req, res) => {
 router.put("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { creator_id, ...updates } = req.body;
+    const { user_id, ...updates } = req.body;
 
-    if (!creator_id) {
+    if (!user_id) {
       return res.status(400).json({
         success: false,
-        message: "creator_id is required in request body",
+        message: "user_id is required in request body",
       });
     }
 
@@ -148,7 +148,7 @@ router.put("/agents/:id", async (req, res) => {
       });
     }
 
-    const result = await agentService.updateAgent(id, creator_id, updates);
+    const result = await agentService.updateAgent(id, user_id, updates);
     res.json(result);
   } catch (error) {
     console.error("Error updating agent:", error);
@@ -167,16 +167,16 @@ router.put("/agents/:id", async (req, res) => {
 router.delete("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { creator_id } = req.query;
+    const { user_id } = req.query;
 
-    if (!creator_id) {
+    if (!user_id) {
       return res.status(400).json({
         success: false,
-        message: "creator_id query parameter is required",
+        message: "user_id query parameter is required",
       });
     }
 
-    const result = await agentService.deleteAgent(id, creator_id);
+    const result = await agentService.deleteAgent(id, user_id);
     res.json(result);
   } catch (error) {
     console.error("Error deleting agent:", error);

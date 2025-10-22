@@ -10,7 +10,7 @@ async function createAgent(agentData) {
 
   try {
     const {
-      creator_id,
+      user_id,
       agent_type,
       domain,
       campus,
@@ -21,7 +21,7 @@ async function createAgent(agentData) {
 
     const query = `
       INSERT INTO agents (
-        creator_id, agent_type, domain, campus, region, 
+        user_id, agent_type, domain, campus, region, 
         courses, personality
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -29,7 +29,7 @@ async function createAgent(agentData) {
     `;
 
     const values = [
-      creator_id,
+      user_id,
       agent_type,
       domain,
       campus,
@@ -69,7 +69,7 @@ async function getAgentsByCreator(creatorId) {
   try {
     const query = `
       SELECT * FROM agents 
-      WHERE creator_id = $1 
+      WHERE user_id = $1 
       ORDER BY created_at DESC;
     `;
 
@@ -99,7 +99,7 @@ async function getAgentById(agentId, creatorId) {
   try {
     const query = `
       SELECT * FROM agents 
-      WHERE id = $1 AND creator_id = $2;
+      WHERE id = $1 AND user_id = $2;
     `;
 
     const result = await client.query(query, [agentId, creatorId]);
@@ -132,7 +132,7 @@ async function updateAgent(agentId, creatorId, updates) {
 
   try {
     // First verify ownership
-    const checkQuery = `SELECT id FROM agents WHERE id = $1 AND creator_id = $2`;
+    const checkQuery = `SELECT id FROM agents WHERE id = $1 AND user_id = $2`;
     const checkResult = await client.query(checkQuery, [agentId, creatorId]);
 
     if (checkResult.rows.length === 0) {
@@ -176,7 +176,7 @@ async function updateAgent(agentId, creatorId, updates) {
     const updateQuery = `
       UPDATE agents 
       SET ${updateFields.join(", ")}
-      WHERE id = $${paramCount} AND creator_id = $${paramCount + 1}
+      WHERE id = $${paramCount} AND user_id = $${paramCount + 1}
       RETURNING *;
     `;
 
@@ -211,7 +211,7 @@ async function deleteAgent(agentId, creatorId) {
   try {
     const query = `
       DELETE FROM agents 
-      WHERE id = $1 AND creator_id = $2
+      WHERE id = $1 AND user_id = $2
       RETURNING id;
     `;
 
