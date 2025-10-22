@@ -16,7 +16,7 @@ function validateAgentInput(data, isUpdate = false) {
     if (!data.campus) errors.push("campus is required");
   }
 
-  // Validate agent_type if provide
+  // Validate agent_type if provid
   if (data.agent_type) {
     const validTypes = ["instructor", "it_support", "administration"];
     if (!validTypes.includes(data.agent_type)) {
