@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const agentService = require("../services/agentService");
+const voiceService = require("../services/voiceService");
 
 /**
  * Input validation helper
@@ -184,6 +185,99 @@ router.delete("/agents/:id", async (req, res) => {
     res.status(status).json({
       success: false,
       message: error.message || "Failed to delete agent",
+    });
+  }
+});
+
+/**
+ * POST /api/creator/clone_builtin
+ * Save a built-in voice selection for a user
+ */
+router.post("/clone_builtin", async (req, res) => {
+  try {
+    const { user_id, voice_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "user_id is required",
+      });
+    }
+
+    if (!voice_id) {
+      return res.status(400).json({
+        success: false,
+        message: "voice_id is required",
+      });
+    }
+
+    const result = await voiceService.cloneBuiltInVoice(user_id, voice_id);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Error saving voice:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to save voice",
+    });
+  }
+});
+
+/**
+ * GET /api/creator/voices?user_id=xxx
+ * Get all saved voices for a user
+ */
+router.get("/voices", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "user_id query parameter is required",
+      });
+    }
+
+    const result = await voiceService.getUserVoices(user_id);
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching voices:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch voices",
+    });
+  }
+});
+
+/**
+ * DELETE /api/creator/voices
+ * Delete a saved voice for a user
+ */
+router.delete("/voices", async (req, res) => {
+  try {
+    const { user_id, voice_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "user_id query parameter is required",
+      });
+    }
+
+    if (!voice_id) {
+      return res.status(400).json({
+        success: false,
+        message: "voice_id query parameter is required",
+      });
+    }
+
+    const result = await voiceService.deleteUserVoice(user_id, voice_id);
+    res.json(result);
+  } catch (error) {
+    console.error("Error deleting voice:", error);
+    const status = error.message.includes("not found") ? 404 : 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Failed to delete voice",
     });
   }
 });
