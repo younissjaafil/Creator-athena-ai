@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const agentService = require("../services/agentService");
-const voiceService = require("../services/voiceService");
 
 /**
  * Input validation helper
@@ -11,35 +10,33 @@ function validateAgentInput(data, isUpdate = false) {
 
   if (!isUpdate) {
     // Required fields for creation
-    if (!data.user_id) errors.push("user_id is required");
-    if (!data.agent_type) errors.push("agent_type is required");
-    if (!data.domain) errors.push("domain is required");
-    if (!data.campus) errors.push("campus is required");
+    if (!data.instructor_id) errors.push("instructor_id is required");
+    if (!data.name) errors.push("name is required");
   }
 
-  // Validate agent_type if provided
-  if (data.agent_type) {
-    const validTypes = ["instructor", "it_support", "administration"];
-    if (!validTypes.includes(data.agent_type)) {
-      errors.push(`agent_type must be one of: ${validTypes.join(", ")}`);
+  // Validate visibility if provided
+  if (data.visibility) {
+    const validVisibility = ["private", "campus", "public"];
+    if (!validVisibility.includes(data.visibility)) {
+      errors.push(`visibility must be one of: ${validVisibility.join(", ")}`);
     }
   }
 
-  // Validate JSON fields if provided
-  const jsonFields = ["courses", "personality", "ai_config", "tools"];
-  jsonFields.forEach((field) => {
-    if (data[field] !== undefined) {
-      if (field === "courses" || field === "tools") {
-        if (!Array.isArray(data[field])) {
-          errors.push(`${field} must be an array`);
-        }
-      } else {
-        if (typeof data[field] !== "object" || Array.isArray(data[field])) {
-          errors.push(`${field} must be an object`);
-        }
-      }
+  // Validate temperature if provided
+  if (data.temperature !== undefined) {
+    if (
+      typeof data.temperature !== "number" ||
+      data.temperature < 0 ||
+      data.temperature > 2
+    ) {
+      errors.push("temperature must be a number between 0 and 2");
     }
-  });
+  }
+
+  // Validate model_type if provided
+  if (data.model_type && typeof data.model_type !== "string") {
+    errors.push("model_type must be a string");
+  }
 
   return errors;
 }
@@ -71,21 +68,30 @@ router.post("/agents", async (req, res) => {
 });
 
 /**
- * GET /api/creator/agents?user_id=xxx
- * Get all agents for a creator
+ * GET /api/creator/agents?instructor_id=xxx
+ * Get all agents for an instructor
  */
 router.get("/agents", async (req, res) => {
   try {
-    const { user_id } = req.query;
+    const { instructor_id } = req.query;
 
-    if (!user_id) {
+    if (!instructor_id) {
       return res.status(400).json({
         success: false,
-        message: "user_id query parameter is required",
+        message: "instructor_id query parameter is required",
       });
     }
 
-    const result = await agentService.getAgentsByCreator(user_id);
+    // Convert instructor_id to integer
+    const instructorIdInt = parseInt(instructor_id);
+    if (isNaN(instructorIdInt)) {
+      return res.status(400).json({
+        success: false,
+        message: "instructor_id must be a valid number",
+      });
+    }
+
+    const result = await agentService.getAgentsByInstructor(instructorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agents:", error);
@@ -98,21 +104,30 @@ router.get("/agents", async (req, res) => {
 
 /**
  * GET /api/creator/agents/:id
- * Get a single agent by ID
+ * Get a single agent by ID (UUID or integer)
  */
 router.get("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
+    const { instructor_id } = req.query;
 
-    if (!user_id) {
+    if (!instructor_id) {
       return res.status(400).json({
         success: false,
-        message: "user_id query parameter is required",
+        message: "instructor_id query parameter is required",
       });
     }
 
-    const result = await agentService.getAgentById(id, user_id);
+    // Convert instructor_id to integer
+    const instructorIdInt = parseInt(instructor_id);
+    if (isNaN(instructorIdInt)) {
+      return res.status(400).json({
+        success: false,
+        message: "instructor_id must be a valid number",
+      });
+    }
+
+    const result = await agentService.getAgentById(id, instructorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agent:", error);
@@ -131,12 +146,21 @@ router.get("/agents/:id", async (req, res) => {
 router.put("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id, ...updates } = req.body;
+    const { instructor_id, ...updates } = req.body;
 
-    if (!user_id) {
+    if (!instructor_id) {
       return res.status(400).json({
         success: false,
-        message: "user_id is required in request body",
+        message: "instructor_id is required in request body",
+      });
+    }
+
+    // Convert instructor_id to integer
+    const instructorIdInt = parseInt(instructor_id);
+    if (isNaN(instructorIdInt)) {
+      return res.status(400).json({
+        success: false,
+        message: "instructor_id must be a valid number",
       });
     }
 
@@ -149,7 +173,7 @@ router.put("/agents/:id", async (req, res) => {
       });
     }
 
-    const result = await agentService.updateAgent(id, user_id, updates);
+    const result = await agentService.updateAgent(id, instructorIdInt, updates);
     res.json(result);
   } catch (error) {
     console.error("Error updating agent:", error);
@@ -168,16 +192,25 @@ router.put("/agents/:id", async (req, res) => {
 router.delete("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_id } = req.query;
+    const { instructor_id } = req.query;
 
-    if (!user_id) {
+    if (!instructor_id) {
       return res.status(400).json({
         success: false,
-        message: "user_id query parameter is required",
+        message: "instructor_id query parameter is required",
       });
     }
 
-    const result = await agentService.deleteAgent(id, user_id);
+    // Convert instructor_id to integer
+    const instructorIdInt = parseInt(instructor_id);
+    if (isNaN(instructorIdInt)) {
+      return res.status(400).json({
+        success: false,
+        message: "instructor_id must be a valid number",
+      });
+    }
+
+    const result = await agentService.deleteAgent(id, instructorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error deleting agent:", error);
@@ -185,99 +218,6 @@ router.delete("/agents/:id", async (req, res) => {
     res.status(status).json({
       success: false,
       message: error.message || "Failed to delete agent",
-    });
-  }
-});
-
-/**
- * POST /api/creator/clone_builtin
- * Save a built-in voice selection for a user
- */
-router.post("/clone_builtin", async (req, res) => {
-  try {
-    const { user_id, voice_id } = req.body;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: "user_id is required",
-      });
-    }
-
-    if (!voice_id) {
-      return res.status(400).json({
-        success: false,
-        message: "voice_id is required",
-      });
-    }
-
-    const result = await voiceService.cloneBuiltInVoice(user_id, voice_id);
-    res.status(201).json(result);
-  } catch (error) {
-    console.error("Error saving voice:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to save voice",
-    });
-  }
-});
-
-/**
- * GET /api/creator/voices?user_id=xxx
- * Get all saved voices for a user
- */
-router.get("/voices", async (req, res) => {
-  try {
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: "user_id query parameter is required",
-      });
-    }
-
-    const result = await voiceService.getUserVoices(user_id);
-    res.json(result);
-  } catch (error) {
-    console.error("Error fetching voices:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch voices",
-    });
-  }
-});
-
-/**
- * DELETE /api/creator/voices
- * Delete a saved voice for a user
- */
-router.delete("/voices", async (req, res) => {
-  try {
-    const { user_id, voice_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: "user_id query parameter is required",
-      });
-    }
-
-    if (!voice_id) {
-      return res.status(400).json({
-        success: false,
-        message: "voice_id query parameter is required",
-      });
-    }
-
-    const result = await voiceService.deleteUserVoice(user_id, voice_id);
-    res.json(result);
-  } catch (error) {
-    console.error("Error deleting voice:", error);
-    const status = error.message.includes("not found") ? 404 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "Failed to delete voice",
     });
   }
 });
