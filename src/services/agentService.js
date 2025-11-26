@@ -1,4 +1,7 @@
 const pool = require("../config/database");
+const axiosWithRetry = require("../utils/axiosWithRetry");
+
+const TRAINING_API_URL = process.env.TRAINING_API_URL || "https://training-service.vercel.app";
 
 /**
  * Create a new agent
@@ -37,17 +40,47 @@ async function createAgent(agentData) {
       throw new Error(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
     }
 
+    // Register agent with Training API first
+    let trainingApiUuid = null;
+    try {
+      const trainingApiPayload = {
+        name,
+        description: description || `AI Agent: ${name}`,
+        personality_name: personality_name || "default",
+        tone: tone || "professional",
+        trait_array: trait_array || [],
+        system_prompt: system_prompt || `You are ${name}, a helpful AI assistant.`,
+        model,
+        temperature,
+        max_tokens,
+      };
+
+      console.log(`Registering agent with Training API: ${TRAINING_API_URL}/api/agents`);
+      const trainingResponse = await axiosWithRetry.post(
+        `${TRAINING_API_URL}/api/agents`,
+        trainingApiPayload
+      );
+
+      // Extract UUID from Training API response
+      trainingApiUuid = trainingResponse.data?.data?.agent_id || trainingResponse.data?.agent_id;
+      console.log(`Training API registered agent with UUID: ${trainingApiUuid}`);
+    } catch (trainingError) {
+      console.error("Failed to register with Training API:", trainingError.message);
+      // Continue with agent creation even if Training API fails
+      // This prevents blocking agent creation if Training service is down
+    }
+
     const query = `
       INSERT INTO agents (
         creator_id, name, description, personality_name, tone,
         trait_array, system_prompt, model, temperature, max_tokens,
-        is_active, role, price_amount, price_currency
+        is_active, role, price_amount, price_currency, training_api_uuid
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING 
         id, creator_id, name, description, personality_name, tone,
         trait_array, system_prompt, model, temperature, max_tokens,
-        is_active, role, price_amount, price_currency,
+        is_active, role, price_amount, price_currency, training_api_uuid,
         created_at, updated_at;
     `;
 
@@ -66,6 +99,7 @@ async function createAgent(agentData) {
       role,
       price_amount,
       price_currency,
+      trainingApiUuid,
     ];
 
     const result = await client.query(query, values);
@@ -101,6 +135,7 @@ async function getAgentsByCreator(creatorId) {
         a.personality_name, a.tone, a.trait_array,
         a.system_prompt, a.model, a.temperature, a.max_tokens,
         a.is_active, a.role, a.price_amount, a.price_currency,
+        a.training_api_uuid,
         a.created_at, a.updated_at,
         u.user_id, u.name as creator_name, u.email as creator_email
       FROM agents a
@@ -140,6 +175,7 @@ async function getAgentById(agentId, creatorId) {
         a.personality_name, a.tone, a.trait_array,
         a.system_prompt, a.model, a.temperature, a.max_tokens,
         a.is_active, a.role, a.price_amount, a.price_currency,
+        a.training_api_uuid,
         a.created_at, a.updated_at,
         u.user_id, u.name as creator_name, u.email as creator_email
       FROM agents a
@@ -227,7 +263,7 @@ async function updateAgent(agentId, creatorId, updates) {
       RETURNING 
         id, creator_id, name, description, personality_name, tone,
         trait_array, system_prompt, model, temperature, max_tokens,
-        is_active, role, price_amount, price_currency,
+        is_active, role, price_amount, price_currency, training_api_uuid,
         created_at, updated_at;
     `;
 
