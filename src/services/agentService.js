@@ -10,13 +10,20 @@ async function createAgent(agentData) {
 
   try {
     const {
-      creator_id, // Creator ID (references users.id) - creators own agents
+      creator_id,
       name,
       description = null,
-      avatar_url = null,
-      model_type = "gpt-5",
+      personality_name = null,
+      tone = null,
+      trait_array = null,
+      system_prompt = null,
+      model = "gpt-4",
       temperature = 0.7,
-      visibility = "private",
+      max_tokens = 2000,
+      is_active = true,
+      role = "free",
+      price_amount = null,
+      price_currency = "USD",
     } = agentData;
 
     // Validate required fields
@@ -24,23 +31,23 @@ async function createAgent(agentData) {
       throw new Error("creator_id and name are required");
     }
 
-    // Validate visibility
-    const validVisibility = ["private", "campus", "public"];
-    if (!validVisibility.includes(visibility)) {
-      throw new Error(
-        `Invalid visibility. Must be one of: ${validVisibility.join(", ")}`
-      );
+    // Validate role
+    const validRoles = ["free", "paid"];
+    if (!validRoles.includes(role)) {
+      throw new Error(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
     }
 
     const query = `
       INSERT INTO agents (
-        creator_id, name, description, avatar_url, 
-        model_type, temperature, visibility
+        creator_id, name, description, personality_name, tone,
+        trait_array, system_prompt, model, temperature, max_tokens,
+        is_active, role, price_amount, price_currency
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING 
-        id, agent_id, creator_id, name, description, 
-        avatar_url, model_type, temperature, visibility, 
+        id, creator_id, name, description, personality_name, tone,
+        trait_array, system_prompt, model, temperature, max_tokens,
+        is_active, role, price_amount, price_currency,
         created_at, updated_at;
     `;
 
@@ -48,10 +55,17 @@ async function createAgent(agentData) {
       creator_id,
       name,
       description,
-      avatar_url,
-      model_type,
+      personality_name,
+      tone,
+      trait_array,
+      system_prompt,
+      model,
       temperature,
-      visibility,
+      max_tokens,
+      is_active,
+      role,
+      price_amount,
+      price_currency,
     ];
 
     const result = await client.query(query, values);
@@ -65,12 +79,6 @@ async function createAgent(agentData) {
     if (error.code === "23503") {
       // Foreign key violation
       throw new Error("Invalid creator_id - user does not exist");
-    }
-    if (error.code === "23514") {
-      // Check constraint violation
-      throw new Error(
-        "Invalid visibility. Must be: private, campus, or public"
-      );
     }
     throw error;
   } finally {
@@ -89,8 +97,10 @@ async function getAgentsByCreator(creatorId) {
   try {
     const query = `
       SELECT 
-        a.id, a.agent_id, a.creator_id, a.name, a.description,
-        a.avatar_url, a.model_type, a.temperature, a.visibility,
+        a.id, a.creator_id, a.name, a.description,
+        a.personality_name, a.tone, a.trait_array,
+        a.system_prompt, a.model, a.temperature, a.max_tokens,
+        a.is_active, a.role, a.price_amount, a.price_currency,
         a.created_at, a.updated_at,
         u.user_id, u.name as creator_name, u.email as creator_email
       FROM agents a
@@ -115,8 +125,8 @@ async function getAgentsByCreator(creatorId) {
 }
 
 /**
- * Get a single agent by UUID or ID
- * @param {String|Number} agentId - Agent UUID or integer ID
+ * Get a single agent by ID
+ * @param {Number} agentId - Agent integer ID
  * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @returns {Promise<Object>} Agent details
  */
@@ -124,33 +134,18 @@ async function getAgentById(agentId, creatorId) {
   const client = await pool.connect();
 
   try {
-    // Check if agentId is UUID or integer ID
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        agentId
-      );
-
-    const query = isUUID
-      ? `
-        SELECT 
-          a.id, a.agent_id, a.creator_id, a.name, a.description,
-          a.avatar_url, a.model_type, a.temperature, a.visibility,
-          a.created_at, a.updated_at,
-          u.user_id, u.name as creator_name, u.email as creator_email
-        FROM agents a
-        LEFT JOIN users u ON a.creator_id = u.id
-        WHERE a.agent_id = $1 AND a.creator_id = $2;
-      `
-      : `
-        SELECT 
-          a.id, a.agent_id, a.creator_id, a.name, a.description,
-          a.avatar_url, a.model_type, a.temperature, a.visibility,
-          a.created_at, a.updated_at,
-          u.user_id, u.name as creator_name, u.email as creator_email
-        FROM agents a
-        LEFT JOIN users u ON a.creator_id = u.id
-        WHERE a.id = $1 AND a.creator_id = $2;
-      `;
+    const query = `
+      SELECT 
+        a.id, a.creator_id, a.name, a.description,
+        a.personality_name, a.tone, a.trait_array,
+        a.system_prompt, a.model, a.temperature, a.max_tokens,
+        a.is_active, a.role, a.price_amount, a.price_currency,
+        a.created_at, a.updated_at,
+        u.user_id, u.name as creator_name, u.email as creator_email
+      FROM agents a
+      LEFT JOIN users u ON a.creator_id = u.id
+      WHERE a.id = $1 AND a.creator_id = $2;
+    `;
 
     const result = await client.query(query, [agentId, creatorId]);
 
@@ -172,7 +167,7 @@ async function getAgentById(agentId, creatorId) {
 
 /**
  * Update an agent
- * @param {String|Number} agentId - Agent UUID or integer ID
+ * @param {Number} agentId - Agent integer ID
  * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @param {Object} updates - Fields to update
  * @returns {Promise<Object>} Updated agent
@@ -181,16 +176,8 @@ async function updateAgent(agentId, creatorId, updates) {
   const client = await pool.connect();
 
   try {
-    // Check if agentId is UUID or integer ID
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        agentId
-      );
-
     // First verify ownership
-    const checkQuery = isUUID
-      ? `SELECT id FROM agents WHERE agent_id = $1 AND creator_id = $2`
-      : `SELECT id FROM agents WHERE id = $1 AND creator_id = $2`;
+    const checkQuery = `SELECT id FROM agents WHERE id = $1 AND creator_id = $2`;
     const checkResult = await client.query(checkQuery, [agentId, creatorId]);
 
     if (checkResult.rows.length === 0) {
@@ -201,10 +188,17 @@ async function updateAgent(agentId, creatorId, updates) {
     const allowedFields = [
       "name",
       "description",
-      "avatar_url",
-      "model_type",
+      "personality_name",
+      "tone",
+      "trait_array",
+      "system_prompt",
+      "model",
       "temperature",
-      "visibility",
+      "max_tokens",
+      "is_active",
+      "role",
+      "price_amount",
+      "price_currency",
     ];
 
     const updateFields = [];
@@ -226,25 +220,16 @@ async function updateAgent(agentId, creatorId, updates) {
     values.push(agentId);
     values.push(creatorId);
 
-    const updateQuery = isUUID
-      ? `
-        UPDATE agents 
-        SET ${updateFields.join(", ")}
-        WHERE agent_id = $${paramCount} AND creator_id = $${paramCount + 1}
-        RETURNING 
-          id, agent_id, creator_id, name, description, 
-          avatar_url, model_type, temperature, visibility, 
-          created_at, updated_at;
-      `
-      : `
-        UPDATE agents 
-        SET ${updateFields.join(", ")}
-        WHERE id = $${paramCount} AND creator_id = $${paramCount + 1}
-        RETURNING 
-          id, agent_id, creator_id, name, description, 
-          avatar_url, model_type, temperature, visibility, 
-          created_at, updated_at;
-      `;
+    const updateQuery = `
+      UPDATE agents 
+      SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $${paramCount} AND creator_id = $${paramCount + 1}
+      RETURNING 
+        id, creator_id, name, description, personality_name, tone,
+        trait_array, system_prompt, model, temperature, max_tokens,
+        is_active, role, price_amount, price_currency,
+        created_at, updated_at;
+    `;
 
     const result = await client.query(updateQuery, values);
 
@@ -254,11 +239,6 @@ async function updateAgent(agentId, creatorId, updates) {
       data: result.rows[0],
     };
   } catch (error) {
-    if (error.code === "23514") {
-      throw new Error(
-        "Invalid visibility. Must be: private, campus, or public"
-      );
-    }
     throw error;
   } finally {
     client.release();
@@ -267,7 +247,7 @@ async function updateAgent(agentId, creatorId, updates) {
 
 /**
  * Delete an agent
- * @param {String|Number} agentId - Agent UUID or integer ID
+ * @param {Number} agentId - Agent integer ID
  * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @returns {Promise<Object>} Deletion result
  */
@@ -275,23 +255,11 @@ async function deleteAgent(agentId, creatorId) {
   const client = await pool.connect();
 
   try {
-    // Check if agentId is UUID or integer ID
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        agentId
-      );
-
-    const query = isUUID
-      ? `
-        DELETE FROM agents 
-        WHERE agent_id = $1 AND creator_id = $2
-        RETURNING id, agent_id;
-      `
-      : `
-        DELETE FROM agents 
-        WHERE id = $1 AND creator_id = $2
-        RETURNING id, agent_id;
-      `;
+    const query = `
+      DELETE FROM agents 
+      WHERE id = $1 AND creator_id = $2
+      RETURNING id;
+    `;
 
     const result = await client.query(query, [agentId, creatorId]);
 
@@ -304,7 +272,6 @@ async function deleteAgent(agentId, creatorId) {
       message: "Agent deleted successfully",
       data: {
         id: result.rows[0].id,
-        agent_id: result.rows[0].agent_id,
       },
     };
   } catch (error) {

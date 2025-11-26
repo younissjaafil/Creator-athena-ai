@@ -126,11 +126,11 @@ function validateAgentInput(data, isUpdate = false) {
     if (!data.name) errors.push("name is required");
   }
 
-  // Validate visibility if provided
-  if (data.visibility) {
-    const validVisibility = ["private", "campus", "public"];
-    if (!validVisibility.includes(data.visibility)) {
-      errors.push(`visibility must be one of: ${validVisibility.join(", ")}`);
+  // Validate role if provided
+  if (data.role) {
+    const validRoles = ["free", "paid"];
+    if (!validRoles.includes(data.role)) {
+      errors.push(`role must be one of: ${validRoles.join(", ")}`);
     }
   }
 
@@ -145,9 +145,16 @@ function validateAgentInput(data, isUpdate = false) {
     }
   }
 
-  // Validate model_type if provided
-  if (data.model_type && typeof data.model_type !== "string") {
-    errors.push("model_type must be a string");
+  // Validate model if provided
+  if (data.model && typeof data.model !== "string") {
+    errors.push("model must be a string");
+  }
+
+  // Validate max_tokens if provided
+  if (data.max_tokens !== undefined) {
+    if (typeof data.max_tokens !== "number" || data.max_tokens < 1) {
+      errors.push("max_tokens must be a positive number");
+    }
   }
 
   return errors;
