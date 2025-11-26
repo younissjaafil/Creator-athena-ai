@@ -10,7 +10,7 @@ function validateAgentInput(data, isUpdate = false) {
 
   if (!isUpdate) {
     // Required fields for creation
-    if (!data.instructor_id) errors.push("instructor_id is required");
+    if (!data.creator_id) errors.push("creator_id is required");
     if (!data.name) errors.push("name is required");
   }
 
@@ -68,30 +68,30 @@ router.post("/agents", async (req, res) => {
 });
 
 /**
- * GET /api/creator/agents?instructor_id=xxx
- * Get all agents for an instructor
+ * GET /api/creator/agents?creator_id=xxx
+ * Get all agents for a creator
  */
 router.get("/agents", async (req, res) => {
   try {
-    const { instructor_id } = req.query;
+    const { creator_id } = req.query;
 
-    if (!instructor_id) {
+    if (!creator_id) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id query parameter is required",
+        message: "creator_id query parameter is required",
       });
     }
 
-    // Convert instructor_id to integer
-    const instructorIdInt = parseInt(instructor_id);
-    if (isNaN(instructorIdInt)) {
+    // Convert creator_id to integer
+    const creatorIdInt = parseInt(creator_id);
+    if (isNaN(creatorIdInt)) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id must be a valid number",
+        message: "creator_id must be a valid number",
       });
     }
 
-    const result = await agentService.getAgentsByInstructor(instructorIdInt);
+    const result = await agentService.getAgentsByCreator(creatorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agents:", error);
@@ -109,25 +109,25 @@ router.get("/agents", async (req, res) => {
 router.get("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { instructor_id } = req.query;
+    const { creator_id } = req.query;
 
-    if (!instructor_id) {
+    if (!creator_id) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id query parameter is required",
+        message: "creator_id query parameter is required",
       });
     }
 
-    // Convert instructor_id to integer
-    const instructorIdInt = parseInt(instructor_id);
-    if (isNaN(instructorIdInt)) {
+    // Convert creator_id to integer
+    const creatorIdInt = parseInt(creator_id);
+    if (isNaN(creatorIdInt)) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id must be a valid number",
+        message: "creator_id must be a valid number",
       });
     }
 
-    const result = await agentService.getAgentById(id, instructorIdInt);
+    const result = await agentService.getAgentById(id, creatorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error fetching agent:", error);
@@ -146,21 +146,21 @@ router.get("/agents/:id", async (req, res) => {
 router.put("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { instructor_id, ...updates } = req.body;
+    const { creator_id, ...updates } = req.body;
 
-    if (!instructor_id) {
+    if (!creator_id) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id is required in request body",
+        message: "creator_id is required in request body",
       });
     }
 
-    // Convert instructor_id to integer
-    const instructorIdInt = parseInt(instructor_id);
-    if (isNaN(instructorIdInt)) {
+    // Convert creator_id to integer
+    const creatorIdInt = parseInt(creator_id);
+    if (isNaN(creatorIdInt)) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id must be a valid number",
+        message: "creator_id must be a valid number",
       });
     }
 
@@ -173,7 +173,7 @@ router.put("/agents/:id", async (req, res) => {
       });
     }
 
-    const result = await agentService.updateAgent(id, instructorIdInt, updates);
+    const result = await agentService.updateAgent(id, creatorIdInt, updates);
     res.json(result);
   } catch (error) {
     console.error("Error updating agent:", error);
@@ -192,25 +192,25 @@ router.put("/agents/:id", async (req, res) => {
 router.delete("/agents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { instructor_id } = req.query;
+    const { creator_id } = req.query;
 
-    if (!instructor_id) {
+    if (!creator_id) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id query parameter is required",
+        message: "creator_id query parameter is required",
       });
     }
 
-    // Convert instructor_id to integer
-    const instructorIdInt = parseInt(instructor_id);
-    if (isNaN(instructorIdInt)) {
+    // Convert creator_id to integer
+    const creatorIdInt = parseInt(creator_id);
+    if (isNaN(creatorIdInt)) {
       return res.status(400).json({
         success: false,
-        message: "instructor_id must be a valid number",
+        message: "creator_id must be a valid number",
       });
     }
 
-    const result = await agentService.deleteAgent(id, instructorIdInt);
+    const result = await agentService.deleteAgent(id, creatorIdInt);
     res.json(result);
   } catch (error) {
     console.error("Error deleting agent:", error);

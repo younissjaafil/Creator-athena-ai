@@ -10,7 +10,7 @@ async function createAgent(agentData) {
 
   try {
     const {
-      instructor_id, // Now using instructor_id (references users.id)
+      creator_id, // Creator ID (references users.id) - creators own agents
       name,
       description = null,
       avatar_url = null,
@@ -20,8 +20,8 @@ async function createAgent(agentData) {
     } = agentData;
 
     // Validate required fields
-    if (!instructor_id || !name) {
-      throw new Error("instructor_id and name are required");
+    if (!creator_id || !name) {
+      throw new Error("creator_id and name are required");
     }
 
     // Validate visibility
@@ -34,18 +34,18 @@ async function createAgent(agentData) {
 
     const query = `
       INSERT INTO agents (
-        instructor_id, name, description, avatar_url, 
+        creator_id, name, description, avatar_url, 
         model_type, temperature, visibility
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING 
-        id, agent_id, instructor_id, name, description, 
+        id, agent_id, creator_id, name, description, 
         avatar_url, model_type, temperature, visibility, 
         created_at, updated_at;
     `;
 
     const values = [
-      instructor_id,
+      creator_id,
       name,
       description,
       avatar_url,
@@ -64,7 +64,7 @@ async function createAgent(agentData) {
   } catch (error) {
     if (error.code === "23503") {
       // Foreign key violation
-      throw new Error("Invalid instructor_id - user does not exist");
+      throw new Error("Invalid creator_id - user does not exist");
     }
     if (error.code === "23514") {
       // Check constraint violation
@@ -79,27 +79,27 @@ async function createAgent(agentData) {
 }
 
 /**
- * Get all agents for an instructor
- * @param {Number} instructorId - Instructor user ID (from users table)
+ * Get all agents for a creator
+ * @param {Number} creatorId - Creator user ID (from users table)
  * @returns {Promise<Object>} List of agents
  */
-async function getAgentsByInstructor(instructorId) {
+async function getAgentsByCreator(creatorId) {
   const client = await pool.connect();
 
   try {
     const query = `
       SELECT 
-        a.id, a.agent_id, a.instructor_id, a.name, a.description,
+        a.id, a.agent_id, a.creator_id, a.name, a.description,
         a.avatar_url, a.model_type, a.temperature, a.visibility,
         a.created_at, a.updated_at,
-        u.user_id, u.name as instructor_name, u.email as instructor_email
+        u.user_id, u.name as creator_name, u.email as creator_email
       FROM agents a
-      LEFT JOIN users u ON a.instructor_id = u.id
-      WHERE a.instructor_id = $1 
+      LEFT JOIN users u ON a.creator_id = u.id
+      WHERE a.creator_id = $1 
       ORDER BY a.created_at DESC;
     `;
 
-    const result = await client.query(query, [instructorId]);
+    const result = await client.query(query, [creatorId]);
 
     return {
       success: true,
@@ -117,10 +117,10 @@ async function getAgentsByInstructor(instructorId) {
 /**
  * Get a single agent by UUID or ID
  * @param {String|Number} agentId - Agent UUID or integer ID
- * @param {Number} instructorId - Instructor user ID (for ownership verification)
+ * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @returns {Promise<Object>} Agent details
  */
-async function getAgentById(agentId, instructorId) {
+async function getAgentById(agentId, creatorId) {
   const client = await pool.connect();
 
   try {
@@ -133,26 +133,26 @@ async function getAgentById(agentId, instructorId) {
     const query = isUUID
       ? `
         SELECT 
-          a.id, a.agent_id, a.instructor_id, a.name, a.description,
+          a.id, a.agent_id, a.creator_id, a.name, a.description,
           a.avatar_url, a.model_type, a.temperature, a.visibility,
           a.created_at, a.updated_at,
-          u.user_id, u.name as instructor_name, u.email as instructor_email
+          u.user_id, u.name as creator_name, u.email as creator_email
         FROM agents a
-        LEFT JOIN users u ON a.instructor_id = u.id
-        WHERE a.agent_id = $1 AND a.instructor_id = $2;
+        LEFT JOIN users u ON a.creator_id = u.id
+        WHERE a.agent_id = $1 AND a.creator_id = $2;
       `
       : `
         SELECT 
-          a.id, a.agent_id, a.instructor_id, a.name, a.description,
+          a.id, a.agent_id, a.creator_id, a.name, a.description,
           a.avatar_url, a.model_type, a.temperature, a.visibility,
           a.created_at, a.updated_at,
-          u.user_id, u.name as instructor_name, u.email as instructor_email
+          u.user_id, u.name as creator_name, u.email as creator_email
         FROM agents a
-        LEFT JOIN users u ON a.instructor_id = u.id
-        WHERE a.id = $1 AND a.instructor_id = $2;
+        LEFT JOIN users u ON a.creator_id = u.id
+        WHERE a.id = $1 AND a.creator_id = $2;
       `;
 
-    const result = await client.query(query, [agentId, instructorId]);
+    const result = await client.query(query, [agentId, creatorId]);
 
     if (result.rows.length === 0) {
       throw new Error("Agent not found or access denied");
@@ -173,11 +173,11 @@ async function getAgentById(agentId, instructorId) {
 /**
  * Update an agent
  * @param {String|Number} agentId - Agent UUID or integer ID
- * @param {Number} instructorId - Instructor user ID (for ownership verification)
+ * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @param {Object} updates - Fields to update
  * @returns {Promise<Object>} Updated agent
  */
-async function updateAgent(agentId, instructorId, updates) {
+async function updateAgent(agentId, creatorId, updates) {
   const client = await pool.connect();
 
   try {
@@ -189,9 +189,9 @@ async function updateAgent(agentId, instructorId, updates) {
 
     // First verify ownership
     const checkQuery = isUUID
-      ? `SELECT id FROM agents WHERE agent_id = $1 AND instructor_id = $2`
-      : `SELECT id FROM agents WHERE id = $1 AND instructor_id = $2`;
-    const checkResult = await client.query(checkQuery, [agentId, instructorId]);
+      ? `SELECT id FROM agents WHERE agent_id = $1 AND creator_id = $2`
+      : `SELECT id FROM agents WHERE id = $1 AND creator_id = $2`;
+    const checkResult = await client.query(checkQuery, [agentId, creatorId]);
 
     if (checkResult.rows.length === 0) {
       throw new Error("Agent not found or access denied");
@@ -224,24 +224,24 @@ async function updateAgent(agentId, instructorId, updates) {
     }
 
     values.push(agentId);
-    values.push(instructorId);
+    values.push(creatorId);
 
     const updateQuery = isUUID
       ? `
         UPDATE agents 
         SET ${updateFields.join(", ")}
-        WHERE agent_id = $${paramCount} AND instructor_id = $${paramCount + 1}
+        WHERE agent_id = $${paramCount} AND creator_id = $${paramCount + 1}
         RETURNING 
-          id, agent_id, instructor_id, name, description, 
+          id, agent_id, creator_id, name, description, 
           avatar_url, model_type, temperature, visibility, 
           created_at, updated_at;
       `
       : `
         UPDATE agents 
         SET ${updateFields.join(", ")}
-        WHERE id = $${paramCount} AND instructor_id = $${paramCount + 1}
+        WHERE id = $${paramCount} AND creator_id = $${paramCount + 1}
         RETURNING 
-          id, agent_id, instructor_id, name, description, 
+          id, agent_id, creator_id, name, description, 
           avatar_url, model_type, temperature, visibility, 
           created_at, updated_at;
       `;
@@ -268,10 +268,10 @@ async function updateAgent(agentId, instructorId, updates) {
 /**
  * Delete an agent
  * @param {String|Number} agentId - Agent UUID or integer ID
- * @param {Number} instructorId - Instructor user ID (for ownership verification)
+ * @param {Number} creatorId - Creator user ID (for ownership verification)
  * @returns {Promise<Object>} Deletion result
  */
-async function deleteAgent(agentId, instructorId) {
+async function deleteAgent(agentId, creatorId) {
   const client = await pool.connect();
 
   try {
@@ -284,16 +284,16 @@ async function deleteAgent(agentId, instructorId) {
     const query = isUUID
       ? `
         DELETE FROM agents 
-        WHERE agent_id = $1 AND instructor_id = $2
+        WHERE agent_id = $1 AND creator_id = $2
         RETURNING id, agent_id;
       `
       : `
         DELETE FROM agents 
-        WHERE id = $1 AND instructor_id = $2
+        WHERE id = $1 AND creator_id = $2
         RETURNING id, agent_id;
       `;
 
-    const result = await client.query(query, [agentId, instructorId]);
+    const result = await client.query(query, [agentId, creatorId]);
 
     if (result.rows.length === 0) {
       throw new Error("Agent not found or access denied");
@@ -316,7 +316,7 @@ async function deleteAgent(agentId, instructorId) {
 
 module.exports = {
   createAgent,
-  getAgentsByInstructor,
+  getAgentsByCreator,
   getAgentById,
   updateAgent,
   deleteAgent,
