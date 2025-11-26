@@ -1,7 +1,8 @@
 const pool = require("../config/database");
 const axiosWithRetry = require("../utils/axiosWithRetry");
 
-const TRAINING_API_URL = process.env.TRAINING_API_URL || "https://training-service.vercel.app";
+const TRAINING_API_URL =
+  process.env.TRAINING_API_URL || "https://training-service.vercel.app";
 
 /**
  * Create a new agent
@@ -49,23 +50,33 @@ async function createAgent(agentData) {
         personality_name: personality_name || "default",
         tone: tone || "professional",
         trait_array: trait_array || [],
-        system_prompt: system_prompt || `You are ${name}, a helpful AI assistant.`,
+        system_prompt:
+          system_prompt || `You are ${name}, a helpful AI assistant.`,
         model,
         temperature,
         max_tokens,
       };
 
-      console.log(`Registering agent with Training API: ${TRAINING_API_URL}/api/agents`);
+      console.log(
+        `Registering agent with Training API: ${TRAINING_API_URL}/api/agents`
+      );
       const trainingResponse = await axiosWithRetry.post(
         `${TRAINING_API_URL}/api/agents`,
         trainingApiPayload
       );
 
       // Extract UUID from Training API response
-      trainingApiUuid = trainingResponse.data?.data?.agent_id || trainingResponse.data?.agent_id;
-      console.log(`Training API registered agent with UUID: ${trainingApiUuid}`);
+      trainingApiUuid =
+        trainingResponse.data?.data?.agent_id ||
+        trainingResponse.data?.agent_id;
+      console.log(
+        `Training API registered agent with UUID: ${trainingApiUuid}`
+      );
     } catch (trainingError) {
-      console.error("Failed to register with Training API:", trainingError.message);
+      console.error(
+        "Failed to register with Training API:",
+        trainingError.message
+      );
       // Continue with agent creation even if Training API fails
       // This prevents blocking agent creation if Training service is down
     }
